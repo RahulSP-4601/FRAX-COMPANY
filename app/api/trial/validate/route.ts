@@ -18,7 +18,10 @@ export async function POST(request: NextRequest) {
     const { token, secret } = body;
 
     // Verify shared secret
-    if (!secret || typeof secret !== 'string' || secret !== process.env.FRAX_COMPANY_API_SECRET) {
+    const expectedSecret =
+      process.env.FRAX_COMPANY_API_SECRET || process.env.INTERNAL_API_SECRET;
+
+    if (!secret || typeof secret !== 'string' || secret !== expectedSecret) {
       return NextResponse.json(
         { valid: false, error: "Invalid secret" },
         { status: 401 }
