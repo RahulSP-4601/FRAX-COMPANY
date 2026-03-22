@@ -1,6 +1,5 @@
 import "server-only";
-
-const WAITLIST_TABLES = ["WaitlistEntry", "Waitlist"] as const;
+const WAITLIST_TABLE = "Waitlist" as const;
 
 export interface NormalizedWaitlistEntry {
   id: string;
@@ -34,27 +33,23 @@ function normalizeWaitlistEntry(entry: any): NormalizedWaitlistEntry {
 }
 
 export async function fetchWaitlistEntries(supabase: any) {
-  for (const table of WAITLIST_TABLES) {
-    const { data, error } = await supabase
-      .from(table)
-      .select("*");
+  const { data, error } = await supabase
+    .from(WAITLIST_TABLE)
+    .select("*");
 
-    if (error) {
-      console.error(`Waitlist fetch error from ${table}:`, error);
-      continue;
-    }
-
-    const normalizedEntries = (data || []).map(normalizeWaitlistEntry);
-    normalizedEntries.sort((a: NormalizedWaitlistEntry, b: NormalizedWaitlistEntry) => {
-      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return bTime - aTime;
-    });
-
-    return normalizedEntries;
+  if (error) {
+    console.error(`Waitlist fetch error from ${WAITLIST_TABLE}:`, error);
+    return [];
   }
 
-  return [];
+  const normalizedEntries = (data || []).map(normalizeWaitlistEntry);
+  normalizedEntries.sort((a: NormalizedWaitlistEntry, b: NormalizedWaitlistEntry) => {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  return normalizedEntries;
 }
 
 export async function updateWaitlistByEmail(
@@ -67,20 +62,17 @@ export async function updateWaitlistByEmail(
     invitedByEmployeeId?: string;
   }
 ) {
-  for (const table of WAITLIST_TABLES) {
-    const { error } = await supabase
-      .from(table)
-      .update(values)
-      .eq("email", email.toLowerCase());
+  const { error } = await supabase
+    .from(WAITLIST_TABLE)
+    .update(values)
+    .eq("email", email.toLowerCase());
 
-    if (!error) {
-      return true;
-    }
-
-    console.error(`Waitlist update by email failed on ${table}:`, error);
+  if (error) {
+    console.error(`Waitlist update by email failed on ${WAITLIST_TABLE}:`, error);
+    return false;
   }
 
-  return false;
+  return true;
 }
 
 export async function updateWaitlistByTrialToken(
@@ -90,18 +82,15 @@ export async function updateWaitlistByTrialToken(
     status: string;
   }
 ) {
-  for (const table of WAITLIST_TABLES) {
-    const { error } = await supabase
-      .from(table)
-      .update(values)
-      .eq("trialToken", trialToken);
+  const { error } = await supabase
+    .from(WAITLIST_TABLE)
+    .update(values)
+    .eq("trialToken", trialToken);
 
-    if (!error) {
-      return true;
-    }
-
-    console.error(`Waitlist update by token failed on ${table}:`, error);
+  if (error) {
+    console.error(`Waitlist update by token failed on ${WAITLIST_TABLE}:`, error);
+    return false;
   }
 
-  return false;
+  return true;
 }
