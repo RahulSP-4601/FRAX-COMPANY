@@ -14,6 +14,14 @@ export interface NormalizedWaitlistEntry {
 }
 
 function normalizeWaitlistEntry(entry: any): NormalizedWaitlistEntry {
+  const rawStatus = entry.status || "PENDING";
+  const normalizedStatus =
+    rawStatus === "APPROVED"
+      ? "TRIAL_SENT"
+      : rawStatus === "REJECTED"
+        ? "DECLINED"
+        : rawStatus;
+
   return {
     id: entry.id,
     companyName:
@@ -25,7 +33,7 @@ function normalizeWaitlistEntry(entry: any): NormalizedWaitlistEntry {
     email: entry.email,
     phone: entry.phone || entry.phoneNumber || entry.phone_number || null,
     source: entry.source || entry.howDidYouHear || entry.how_did_you_hear || null,
-    status: entry.status || "PENDING",
+    status: normalizedStatus,
     trialToken: entry.trialToken || entry.trial_token || null,
     trialSentAt: entry.trialSentAt || entry.trial_sent_at || null,
     createdAt: entry.createdAt || entry.created_at || null,
@@ -62,21 +70,33 @@ export async function updateWaitlistByEmail(
     invitedByEmployeeId?: string;
   }
 ) {
-  const updateAttempts = [
-    values,
+  const statusCandidates =
+    values.status === "TRIAL_SENT"
+      ? ["TRIAL_SENT", "APPROVED"]
+      : values.status === "CONVERTED"
+        ? ["CONVERTED", "APPROVED"]
+        : values.status === "DECLINED"
+          ? ["DECLINED", "REJECTED"]
+          : [values.status];
+
+  const updateAttempts = statusCandidates.flatMap((statusValue) => [
     {
-      status: values.status,
+      ...values,
+      status: statusValue,
+    },
+    {
+      status: statusValue,
       trialToken: values.trialToken,
       trialSentAt: values.trialSentAt,
     },
     {
-      status: values.status,
+      status: statusValue,
       trialSentAt: values.trialSentAt,
     },
     {
-      status: values.status,
+      status: statusValue,
     },
-  ];
+  ]);
 
   for (const attempt of updateAttempts) {
     const sanitizedAttempt = Object.fromEntries(
@@ -105,24 +125,36 @@ export async function updateWaitlistByTrialToken(
     status: string;
   }
 ) {
-  let { error } = await supabase
-    .from(WAITLIST_TABLE)
-    .update(values)
-    .eq("trialToken", trialToken);
+  const statusCandidates =
+    values.status === "CONVERTED"
+      ? ["CONVERTED", "APPROVED"]
+      : values.status === "DECLINED"
+        ? ["DECLINED", "REJECTED"]
+        : [values.status];
 
-  if (error) {
+  for (const statusValue of statusCandidates) {
+    let { error } = await supabase
+      .from(WAITLIST_TABLE)
+      .update({ ...values, status: statusValue })
+      .eq("trialToken", trialToken);
+
+    if (!error) {
+      return true;
+    }
+
     console.error(`Waitlist update by token failed on ${WAITLIST_TABLE}:`, error);
 
     ({ error } = await supabase
       .from(WAITLIST_TABLE)
-      .update({ status: values.status })
+      .update({ status: statusValue })
       .eq("trialToken", trialToken));
 
-    if (error) {
-      console.error(`Waitlist status-only update by token failed on ${WAITLIST_TABLE}:`, error);
-      return false;
+    if (!error) {
+      return true;
     }
+
+    console.error(`Waitlist status-only update by token failed on ${WAITLIST_TABLE}:`, error);
   }
 
-  return true;
+  return false;
 }
