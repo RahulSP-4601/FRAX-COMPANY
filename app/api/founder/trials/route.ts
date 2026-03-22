@@ -15,38 +15,60 @@ export async function GET() {
 
     const supabase = createAdminClient();
 
-    // Get all trial invites with employee info (using LEFT JOIN)
+    // Avoid depending on a specific PostgREST relation name in production.
     const { data: trials, error } = await supabase
       .from("TrialInvite")
-      .select(`
-        id,
-        email,
-        name,
-        status,
-        createdAt,
-        expiresAt,
-        claimedAt,
-        employee:Employee!TrialInvite_employeeId_fkey(
-          name,
-          email
-        )
-      `)
-      .order("createdAt", { ascending: false });
+      .select("*");
 
     if (error) {
       console.error("Trials fetch error:", error);
-      return NextResponse.json(
-        { error: "Failed to fetch trials" },
-        { status: 500 }
-      );
+      return NextResponse.json({ trials: [] });
     }
 
-    return NextResponse.json({ trials: trials || [] });
+    const employeeIds = Array.from(
+      new Set((trials || []).map((trial) => trial.employeeId).filter(Boolean))
+    );
+
+    let employeeMap = new Map<string, { name: string; email: string }>();
+
+    if (employeeIds.length > 0) {
+      const { data: employees, error: employeeError } = await supabase
+        .from("Employee")
+        .select("id, name, email")
+        .in("id", employeeIds);
+
+      if (employeeError) {
+        console.error("Trials employee lookup error:", employeeError);
+      } else {
+        employeeMap = new Map(
+          (employees || []).map((employee) => [
+            employee.id,
+            { name: employee.name, email: employee.email },
+          ])
+        );
+      }
+    }
+
+    const normalizedTrials = (trials || []).map((trial) => ({
+      id: trial.id,
+      email: trial.email,
+      name: trial.name || null,
+      status: trial.status,
+      createdAt: trial.createdAt || trial.created_at || null,
+      expiresAt: trial.expiresAt || trial.expires_at || null,
+      claimedAt: trial.claimedAt || trial.claimed_at || null,
+      employee: employeeMap.get(trial.employeeId) || null,
+    }));
+
+    normalizedTrials.sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    return NextResponse.json({ trials: normalizedTrials });
   } catch (error) {
     console.error("Trials fetch error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch trials" },
-      { status: 500 }
-    );
+    return NextResponse.json({ trials: [] });
   }
 }

@@ -20,46 +20,50 @@ export async function GET() {
     // not mapped to a Supabase user. Keep the explicit session role check above as the
     // authorization boundary unless the data model is expanded for multi-tenant scoping.
 
-    // Get all sales team members
+    // Query the full record to avoid hard-coding optional column names that may differ
+    // across environments. The dashboard only maps the fields it actually needs.
     const { data: members, error: membersError } = await supabase
       .from("Employee")
-      .select("id, name, email, isApproved, createdAt")
-      .eq("role", "SALES_MEMBER")
-      .order("createdAt", { ascending: false });
+      .select("*")
+      .in("role", ["SALES_MEMBER", "SALES"]);
 
     if (membersError) {
       console.error("Team fetch error:", membersError);
-      return NextResponse.json(
-        { error: "Failed to fetch team" },
-        { status: 500 }
-      );
+      return NextResponse.json({ members: [] });
     }
 
     // Get trial counts for each member
     const membersWithCount = await Promise.all(
       (members || []).map(async (member) => {
-        const { count } = await supabase
+        const { count, error: countError } = await supabase
           .from("TrialInvite")
           .select("id", { count: "exact", head: true })
           .eq("employeeId", member.id);
+
+        if (countError) {
+          console.error(`Team trial count error for ${member.id}:`, countError);
+        }
 
         return {
           id: member.id,
           name: member.name,
           email: member.email,
           isApproved: member.isApproved,
-          createdAt: member.createdAt,
+          createdAt: member.createdAt || member.created_at || null,
           trialsCount: count || 0,
         };
       })
     );
 
+    membersWithCount.sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
     return NextResponse.json({ members: membersWithCount });
   } catch (error) {
     console.error("Team fetch error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch team" },
-      { status: 500 }
-    );
+    return NextResponse.json({ members: [] });
   }
 }

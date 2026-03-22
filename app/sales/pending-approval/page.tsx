@@ -7,8 +7,13 @@ export default function PendingApprovalPage() {
 
   const handleSignOut = async () => {
     try {
-      await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+      const res = await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        throw new Error("Failed to sign out");
+      }
+
       router.push("/signin");
+      router.refresh();
     } catch {
       console.error("Failed to sign out");
     }

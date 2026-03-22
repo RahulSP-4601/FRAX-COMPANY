@@ -8,7 +8,7 @@ interface SalesMember {
   name: string;
   email: string;
   isApproved: boolean;
-  createdAt: string;
+  createdAt: string | null;
   trialsCount: number;
 }
 
@@ -28,15 +28,22 @@ interface TrialInvite {
   email: string;
   name: string | null;
   status: string;
-  createdAt: string;
-  expiresAt: string;
+  createdAt: string | null;
+  expiresAt: string | null;
   claimedAt: string | null;
-  employee: { name: string; email: string };
+  employee: { name: string; email: string } | null;
 }
 
 type Tab = "team" | "waitlist" | "trials";
 
-const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString("en-US");
+const formatDate = (dateStr?: string | null) => {
+  if (!dateStr) return "—";
+
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString("en-US");
+};
 
 export default function FounderDashboardPage() {
   const router = useRouter();
@@ -51,7 +58,7 @@ export default function FounderDashboardPage() {
 
   // Add sales member form
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
-  const [memberForm, setMemberForm] = useState({ name: "", email: "", password: "" });
+  const [memberForm, setMemberForm] = useState({ name: "", email: "" });
   const [addingMember, setAddingMember] = useState(false);
 
   const fetchData = async () => {
@@ -120,35 +127,18 @@ export default function FounderDashboardPage() {
         return;
       }
 
-      setSuccessMessage(`Sales member ${memberForm.name} added successfully!`);
-      setMemberForm({ name: "", email: "", password: "" });
+      setSuccessMessage(
+        data.resent
+          ? `Activation email resent to ${memberForm.email}.`
+          : `Sales member invite sent to ${memberForm.email}.`
+      );
+      setMemberForm({ name: "", email: "" });
       setShowAddMemberForm(false);
       await fetchData();
     } catch {
       setError("Network error");
     } finally {
       setAddingMember(false);
-    }
-  };
-
-  const handleApproveMember = async (id: string) => {
-    setError("");
-    try {
-      const res = await fetch(`/api/founder/team/${id}/approve`, {
-        method: "PATCH",
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Failed to approve member");
-        return;
-      }
-
-      setSuccessMessage("Member approved successfully!");
-      await fetchData();
-    } catch {
-      setError("Network error");
     }
   };
 
@@ -208,8 +198,13 @@ export default function FounderDashboardPage() {
 
   const handleSignOut = async () => {
     try {
-      await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+      const res = await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        throw new Error("Failed to sign out");
+      }
+
       router.push("/signin");
+      router.refresh();
     } catch {
       setError("Failed to sign out");
     }
@@ -290,6 +285,9 @@ export default function FounderDashboardPage() {
         {tab === "team" && showAddMemberForm && (
           <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Sales Team Member</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              The sales member will receive an activation link by email and set their own password.
+            </p>
             <form onSubmit={handleAddMember} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
@@ -313,24 +311,12 @@ export default function FounderDashboardPage() {
                   placeholder="john@example.com"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-                <input
-                  type="password"
-                  value={memberForm.password}
-                  onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })}
-                  required
-                  minLength={8}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Minimum 8 characters"
-                />
-              </div>
               <button
                 type="submit"
                 disabled={addingMember}
                 className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {addingMember ? "Adding..." : "Add Sales Member"}
+                {addingMember ? "Sending Invite..." : "Send Activation Invite"}
               </button>
             </form>
           </div>
@@ -344,7 +330,7 @@ export default function FounderDashboardPage() {
               <div className="bg-white border border-yellow-200 rounded-xl shadow-sm">
                 <div className="p-5 border-b border-yellow-100">
                   <h2 className="text-lg font-semibold text-yellow-700">
-                    Pending Approval ({pendingMembers.length})
+                    Pending Activation ({pendingMembers.length})
                   </h2>
                 </div>
                 <div className="divide-y divide-gray-100">
@@ -354,16 +340,13 @@ export default function FounderDashboardPage() {
                         <p className="font-medium text-gray-900">{member.name}</p>
                         <p className="text-sm text-gray-500">{member.email}</p>
                         <p className="text-xs text-gray-400 mt-1">
-                          Applied {formatDate(member.createdAt)}
+                          Invite sent {formatDate(member.createdAt)}
+                        </p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          Waiting for the sales member to open the email invite and set a password.
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => handleApproveMember(member.id)}
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
-                        >
-                          Approve
-                        </button>
                         <button
                           onClick={() => handleRejectMember(member.id)}
                           className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm rounded-lg transition-colors"
@@ -512,7 +495,7 @@ export default function FounderDashboardPage() {
                       <tr key={trial.id} className="border-b border-gray-100">
                         <td className="px-5 py-3 text-gray-900">{trial.name || "—"}</td>
                         <td className="px-5 py-3 text-gray-600">{trial.email}</td>
-                        <td className="px-5 py-3 text-gray-600">{trial.employee.name}</td>
+                        <td className="px-5 py-3 text-gray-600">{trial.employee?.name || "—"}</td>
                         <td className="px-5 py-3">
                           <span
                             className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${

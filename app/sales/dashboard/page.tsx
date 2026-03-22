@@ -8,12 +8,19 @@ interface TrialInvite {
   email: string;
   name: string | null;
   status: string;
-  createdAt: string;
-  expiresAt: string;
+  createdAt: string | null;
+  expiresAt: string | null;
   claimedAt: string | null;
 }
 
-const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString("en-US");
+const formatDate = (dateStr?: string | null) => {
+  if (!dateStr) return "—";
+
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString("en-US");
+};
 
 export default function SalesDashboardPage() {
   const router = useRouter();
@@ -77,8 +84,13 @@ export default function SalesDashboardPage() {
 
   const handleSignOut = async () => {
     try {
-      await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+      const res = await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        throw new Error("Failed to sign out");
+      }
+
       router.push("/signin");
+      router.refresh();
     } catch {
       setError("Failed to sign out");
     }

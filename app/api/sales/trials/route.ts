@@ -15,27 +15,37 @@ export async function GET() {
 
     const supabase = createAdminClient();
 
-    // Get trials sent by this sales member
+    // Query the full record to avoid hard-coding column names that may differ
+    // across environments.
     const { data: trials, error } = await supabase
       .from("TrialInvite")
-      .select("id, email, name, status, createdAt, expiresAt, claimedAt")
-      .eq("employeeId", session.employeeId)
-      .order("createdAt", { ascending: false });
+      .select("*")
+      .eq("employeeId", session.employeeId);
 
     if (error) {
       console.error("Sales trials fetch error:", error);
-      return NextResponse.json(
-        { error: "Failed to fetch trials" },
-        { status: 500 }
-      );
+      return NextResponse.json({ trials: [] });
     }
 
-    return NextResponse.json({ trials: trials || [] });
+    const normalizedTrials = (trials || []).map((trial) => ({
+      id: trial.id,
+      email: trial.email,
+      name: trial.name || null,
+      status: trial.status,
+      createdAt: trial.createdAt || trial.created_at || null,
+      expiresAt: trial.expiresAt || trial.expires_at || null,
+      claimedAt: trial.claimedAt || trial.claimed_at || null,
+    }));
+
+    normalizedTrials.sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    return NextResponse.json({ trials: normalizedTrials });
   } catch (error) {
     console.error("Sales trials fetch error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch trials" },
-      { status: 500 }
-    );
+    return NextResponse.json({ trials: [] });
   }
 }

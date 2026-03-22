@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { createEmployeeActivationToken } from "@/lib/auth/employee-activation";
+import { sendSalesMemberActivationEmail } from "@/lib/email";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 
 const SALT_ROUNDS = 12;
 
@@ -28,50 +31,70 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, email, password } = body;
+    const { name, email } = body;
 
-    if (!name || typeof name !== 'string' || !email || typeof email !== 'string' || !password || typeof password !== 'string') {
+    if (!name || typeof name !== "string" || !email || typeof email !== "string") {
       return NextResponse.json(
-        { error: "Name, email, and password are required" },
-        { status: 400 }
-      );
-    }
-
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
+        { error: "Name and email are required" },
         { status: 400 }
       );
     }
 
     const supabase = createAdminClient();
+    const normalizedName = name.trim();
+    const normalizedEmail = email.toLowerCase().trim();
+    const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
 
     // Check if email already exists
     const { data: existing } = await supabase
       .from("Employee")
-      .select("id")
-      .eq("email", email.toLowerCase())
-      .single();
+      .select("id, name, email, role, isApproved")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
 
     if (existing) {
+      if ((existing.role === "SALES_MEMBER" || existing.role === "SALES") && !existing.isApproved) {
+        const token = await createEmployeeActivationToken({
+          employeeId: existing.id,
+          email: existing.email,
+        });
+        const activationLink = `${baseUrl}/activate?token=${encodeURIComponent(token)}`;
+
+        await sendSalesMemberActivationEmail({
+          to: existing.email,
+          name: existing.name || normalizedName,
+          activationLink,
+        });
+
+        return NextResponse.json({
+          success: true,
+          resent: true,
+          member: {
+            id: existing.id,
+            name: existing.name,
+            email: existing.email,
+          },
+        });
+      }
+
       return NextResponse.json(
         { error: "An account with this email already exists" },
         { status: 409 }
       );
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    const temporaryPassword = randomBytes(24).toString("hex");
+    const passwordHash = await bcrypt.hash(temporaryPassword, SALT_ROUNDS);
 
-    // Create sales member (pre-approved by default since founder is adding them)
+    // Create a pending sales member. They set their own password via activation email.
     const { data: member, error: createError } = await supabase
       .from("Employee")
       .insert({
-        name,
-        email: email.toLowerCase(),
+        name: normalizedName,
+        email: normalizedEmail,
         passwordHash,
         role: "SALES_MEMBER",
-        isApproved: true, // Auto-approve when founder adds them
+        isApproved: false,
       })
       .select()
       .single();
@@ -80,6 +103,28 @@ export async function POST(request: NextRequest) {
       console.error("Add member error:", createError);
       return NextResponse.json(
         { error: "Failed to add member" },
+        { status: 500 }
+      );
+    }
+
+    const token = await createEmployeeActivationToken({
+      employeeId: member.id,
+      email: member.email,
+    });
+    const activationLink = `${baseUrl}/activate?token=${encodeURIComponent(token)}`;
+
+    try {
+      await sendSalesMemberActivationEmail({
+        to: member.email,
+        name: member.name,
+        activationLink,
+      });
+    } catch (emailError) {
+      console.error("Add member email error:", emailError);
+      await supabase.from("Employee").delete().eq("id", member.id);
+
+      return NextResponse.json(
+        { error: "Failed to send activation email" },
         { status: 500 }
       );
     }

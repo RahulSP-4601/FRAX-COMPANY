@@ -65,9 +65,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if ((employee.role === "SALES_MEMBER" || employee.role === "SALES") && !employee.isApproved) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Your account is not active yet. Use the activation link sent to your email to set your password.",
+        },
+        { status: 403 }
+      );
+    }
+
     // Verify password
     console.log("  Testing password...");
-    const isValid = await bcrypt.compare(password, employee.passwordHash);
+    const isValid = employee.passwordHash
+      ? await bcrypt.compare(password, employee.passwordHash)
+      : false;
     console.log("  Password valid:", isValid);
     console.log("  Hash in DB:", employee.passwordHash?.substring(0, 20) + "...");
 

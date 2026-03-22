@@ -10,6 +10,7 @@ function SignInForm() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const activated = searchParams.get("activated") === "1";
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -60,6 +61,12 @@ function SignInForm() {
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
               {error}
+            </div>
+          )}
+
+          {activated && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
+              Account activated. Sign in with your email and new password.
             </div>
           )}
 
