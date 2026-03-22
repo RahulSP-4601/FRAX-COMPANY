@@ -43,7 +43,11 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
     const normalizedName = name.trim();
     const normalizedEmail = email.toLowerCase().trim();
-    const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+    const baseUrl =
+      request.nextUrl.origin ||
+      process.env.APP_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      "http://localhost:3001";
 
     // Check if email already exists
     const { data: existing } = await supabase
