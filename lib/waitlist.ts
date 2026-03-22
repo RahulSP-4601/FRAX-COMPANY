@@ -62,17 +62,40 @@ export async function updateWaitlistByEmail(
     invitedByEmployeeId?: string;
   }
 ) {
-  const { error } = await supabase
-    .from(WAITLIST_TABLE)
-    .update(values)
-    .eq("email", email.toLowerCase());
+  const updateAttempts = [
+    values,
+    {
+      status: values.status,
+      trialToken: values.trialToken,
+      trialSentAt: values.trialSentAt,
+    },
+    {
+      status: values.status,
+      trialSentAt: values.trialSentAt,
+    },
+    {
+      status: values.status,
+    },
+  ];
 
-  if (error) {
+  for (const attempt of updateAttempts) {
+    const sanitizedAttempt = Object.fromEntries(
+      Object.entries(attempt).filter(([, value]) => value !== undefined)
+    );
+
+    const { error } = await supabase
+      .from(WAITLIST_TABLE)
+      .update(sanitizedAttempt)
+      .eq("email", email.toLowerCase());
+
+    if (!error) {
+      return true;
+    }
+
     console.error(`Waitlist update by email failed on ${WAITLIST_TABLE}:`, error);
-    return false;
   }
 
-  return true;
+  return false;
 }
 
 export async function updateWaitlistByTrialToken(
@@ -82,14 +105,23 @@ export async function updateWaitlistByTrialToken(
     status: string;
   }
 ) {
-  const { error } = await supabase
+  let { error } = await supabase
     .from(WAITLIST_TABLE)
     .update(values)
     .eq("trialToken", trialToken);
 
   if (error) {
     console.error(`Waitlist update by token failed on ${WAITLIST_TABLE}:`, error);
-    return false;
+
+    ({ error } = await supabase
+      .from(WAITLIST_TABLE)
+      .update({ status: values.status })
+      .eq("trialToken", trialToken));
+
+    if (error) {
+      console.error(`Waitlist status-only update by token failed on ${WAITLIST_TABLE}:`, error);
+      return false;
+    }
   }
 
   return true;

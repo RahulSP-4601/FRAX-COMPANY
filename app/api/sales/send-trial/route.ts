@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { updateWaitlistByEmail } from "@/lib/waitlist";
+import { sendTrialInviteEmail } from "@/lib/email";
 import { randomBytes } from "crypto";
 
 export async function POST(request: NextRequest) {
@@ -47,9 +48,9 @@ export async function POST(request: NextRequest) {
     // Generate unique token
     const token = randomBytes(32).toString("hex");
 
-    // Create trial invite (expires in 7 days)
+    // Create trial invite (valid for 30 days)
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    expiresAt.setDate(expiresAt.getDate() + 30);
 
     const supabase = createAdminClient();
 
@@ -83,11 +84,16 @@ export async function POST(request: NextRequest) {
       });
 
     if (!waitlistUpdated) {
-      // Don't fail the request if waitlist update fails
+      console.error("Waitlist status update failed after creating trial invite");
     }
 
-    // TODO: Send email with trial link
     const trialLink = `${process.env.NEXT_PUBLIC_FRAX_URL || "http://localhost:3000"}/trial/${token}`;
+
+    await sendTrialInviteEmail({
+      to: email.toLowerCase(),
+      name: name || email,
+      trialLink,
+    });
 
     return NextResponse.json({
       success: true,
