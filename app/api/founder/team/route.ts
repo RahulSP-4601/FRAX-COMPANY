@@ -25,7 +25,7 @@ export async function GET() {
     const { data: members, error: membersError } = await supabase
       .from("Employee")
       .select("*")
-      .in("role", ["SALES_MEMBER", "SALES"]);
+      .eq("role", "SALES");
 
     if (membersError) {
       console.error("Team fetch error:", membersError);

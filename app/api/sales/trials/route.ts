@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const session = await getSession();
 
-    if (!session || session.role !== "SALES_MEMBER") {
+    if (!session || (session.role !== "SALES" && session.role !== "SALES_MEMBER")) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }

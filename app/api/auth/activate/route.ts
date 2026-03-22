@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (employee.role !== "SALES_MEMBER" && employee.role !== "SALES") {
+    if (employee.role !== "SALES") {
       return NextResponse.json(
         { success: false, error: "Activation link is invalid" },
         { status: 400 }

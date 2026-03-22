@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (existing) {
-      if ((existing.role === "SALES_MEMBER" || existing.role === "SALES") && !existing.isApproved) {
+      if (existing.role === "SALES" && !existing.isApproved) {
         const token = await createEmployeeActivationToken({
           employeeId: existing.id,
           email: existing.email,
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
         name: normalizedName,
         email: normalizedEmail,
         passwordHash,
-        role: "SALES_MEMBER",
+        role: "SALES",
         isApproved: false,
       })
       .select()

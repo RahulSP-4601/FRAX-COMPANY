@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if ((employee.role === "SALES_MEMBER" || employee.role === "SALES") && !employee.isApproved) {
+    if (employee.role === "SALES" && !employee.isApproved) {
       return NextResponse.json(
         {
           success: false,
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Support both ADMIN and FOUNDER roles for founder access
     if (employee.role === "FOUNDER" || employee.role === "ADMIN") {
       redirect = "/founder/dashboard";
-    } else if (employee.role === "SALES_MEMBER" || employee.role === "SALES") {
+    } else if (employee.role === "SALES") {
       redirect = employee.isApproved
         ? "/sales/dashboard"
         : "/sales/pending-approval";

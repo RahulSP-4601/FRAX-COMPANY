@@ -37,7 +37,7 @@ export async function PATCH(
       );
     }
 
-    if (member.role !== "SALES_MEMBER" && member.role !== "SALES") {
+    if (member.role !== "SALES") {
       return NextResponse.json(
         { error: "Only sales members can be approved" },
         { status: 400 }
