@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { updateWaitlistByTrialToken } from "@/lib/waitlist";
 
 export async function POST(request: NextRequest) {
   let body: any;
@@ -67,13 +68,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Update waitlist if exists
-    const { error: waitlistError } = await supabase
-      .from("WaitlistEntry")
-      .update({ status: "CONVERTED" })
-      .eq("trialToken", token);
+    const waitlistUpdated = await updateWaitlistByTrialToken(supabase, token, {
+      status: "CONVERTED",
+    });
 
-    if (waitlistError) {
-      console.error("Failed to update waitlist:", waitlistError);
+    if (!waitlistUpdated) {
       // Don't fail the request if waitlist update fails
     }
 

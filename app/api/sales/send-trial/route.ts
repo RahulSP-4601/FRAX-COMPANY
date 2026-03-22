@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { updateWaitlistByEmail } from "@/lib/waitlist";
 import { randomBytes } from "crypto";
 
 export async function POST(request: NextRequest) {
@@ -74,18 +75,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Update waitlist if exists
-    const { error: waitlistError } = await supabase
-      .from("WaitlistEntry")
-      .update({
+    const waitlistUpdated = await updateWaitlistByEmail(supabase, email, {
         status: "TRIAL_SENT",
         trialToken: token,
         trialSentAt: new Date().toISOString(),
         invitedByEmployeeId: session.employeeId,
-      })
-      .eq("email", email.toLowerCase());
+      });
 
-    if (waitlistError) {
-      console.error("Failed to update waitlist:", waitlistError);
+    if (!waitlistUpdated) {
       // Don't fail the request if waitlist update fails
     }
 
