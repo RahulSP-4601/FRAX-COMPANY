@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 
 export async function GET() {
   try {
@@ -13,7 +13,12 @@ export async function GET() {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
+    // This endpoint intentionally bypasses Supabase RLS because employee auth in this
+    // app is handled by our signed session cookie, not Supabase Auth, and the founder
+    // dashboard must read Employee + TrialInvite records even when table policies are
+    // not mapped to a Supabase user. Keep the explicit session role check above as the
+    // authorization boundary unless the data model is expanded for multi-tenant scoping.
 
     // Get all sales team members
     const { data: members, error: membersError } = await supabase

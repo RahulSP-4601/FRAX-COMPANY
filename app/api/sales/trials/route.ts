@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 
 export async function GET() {
   try {
@@ -13,7 +13,7 @@ export async function GET() {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Get trials sent by this sales member
     const { data: trials, error } = await supabase

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 
 export async function PATCH(
   request: NextRequest,
@@ -18,9 +18,32 @@ export async function PATCH(
 
     const { id } = await params;
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
-    // Approve the sales member
+    // This portal is currently single-tenant: there is no org/company scoping field
+    // on Employee or in the session, so we can only authorize by role here.
+    // We still verify the target record before updating so founders/admins cannot
+    // approve arbitrary employee types by ID.
+    const { data: member, error: fetchError } = await supabase
+      .from("Employee")
+      .select("id, role")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !member) {
+      return NextResponse.json(
+        { error: "Employee not found" },
+        { status: 404 }
+      );
+    }
+
+    if (member.role !== "SALES_MEMBER" && member.role !== "SALES") {
+      return NextResponse.json(
+        { error: "Only sales members can be approved" },
+        { status: 400 }
+      );
+    }
+
     const { error } = await supabase
       .from("Employee")
       .update({ isApproved: true })

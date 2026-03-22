@@ -55,6 +55,9 @@ export default function FounderDashboardPage() {
   const [addingMember, setAddingMember] = useState(false);
 
   const fetchData = async () => {
+    setLoading(true);
+    setError("");
+
     try {
       const [teamRes, waitlistRes, trialsRes] = await Promise.all([
         fetch("/api/founder/team", { credentials: "include" }),
@@ -62,19 +65,30 @@ export default function FounderDashboardPage() {
         fetch("/api/founder/trials", { credentials: "include" }),
       ]);
 
-      if (!teamRes.ok || !waitlistRes.ok || !trialsRes.ok) {
-        throw new Error("Failed to fetch data");
+      const [teamData, waitlistData, trialsData] = await Promise.all([
+        teamRes.ok ? teamRes.json() : null,
+        waitlistRes.ok ? waitlistRes.json() : null,
+        trialsRes.ok ? trialsRes.json() : null,
+      ]);
+
+      setSalesTeam(teamData?.members || []);
+      setWaitlist(waitlistData?.entries || []);
+      setTrials(trialsData?.trials || []);
+
+      const failedSections = [
+        !teamRes.ok ? "sales team" : null,
+        !waitlistRes.ok ? "waitlist" : null,
+        !trialsRes.ok ? "trials" : null,
+      ].filter(Boolean);
+
+      if (failedSections.length > 0) {
+        setError(`Some dashboard sections could not be loaded: ${failedSections.join(", ")}`);
       }
-
-      const teamData = await teamRes.json();
-      const waitlistData = await waitlistRes.json();
-      const trialsData = await trialsRes.json();
-
-      setSalesTeam(teamData.members || []);
-      setWaitlist(waitlistData.entries || []);
-      setTrials(trialsData.trials || []);
     } catch {
-      setError("Failed to load data");
+      setSalesTeam([]);
+      setWaitlist([]);
+      setTrials([]);
+      setError("Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
