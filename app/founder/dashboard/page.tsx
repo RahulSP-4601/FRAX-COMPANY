@@ -19,6 +19,8 @@ interface WaitlistEntry {
   phone: string | null;
   source: string | null;
   status: "PENDING" | "TRIAL_SENT" | "CONVERTED" | "DECLINED";
+  statusLabel: string;
+  trialDaysLeft: number | null;
   trialSentAt: string | null;
   createdAt: string;
 }
@@ -439,10 +441,12 @@ export default function FounderDashboardPage() {
                                 ? "bg-blue-100 text-blue-700"
                                 : entry.status === "CONVERTED"
                                   ? "bg-green-100 text-green-700"
-                                  : "bg-yellow-100 text-yellow-700"
+                                  : entry.status === "DECLINED"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-yellow-100 text-yellow-700"
                             }`}
                           >
-                            {entry.status}
+                            {entry.statusLabel}
                           </span>
                         </td>
                         <td className="px-5 py-3 text-gray-500">{formatDate(entry.createdAt)}</td>

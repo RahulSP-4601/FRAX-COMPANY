@@ -69,11 +69,8 @@ export async function POST(request: NextRequest) {
 
     // Update waitlist if exists
     const waitlistUpdated = await updateWaitlistByEmail(supabase, email, {
-        status: "TRIAL_SENT",
-        trialToken: token,
-        trialSentAt: new Date().toISOString(),
-        invitedByEmployeeId: session.employeeId,
-      });
+      status: "TRIAL_SENT",
+    });
 
     if (!waitlistUpdated) {
       console.error("Waitlist status update failed after creating trial invite");
